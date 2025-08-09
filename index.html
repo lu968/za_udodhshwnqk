@@ -17,14 +17,6 @@
 
 /* ▼▼▼ 请用下面这【一整块】全新的代码，替换掉所有旧的 body, phone-frame, phone-screen 等样式 ▼▼▼ */
 
-      /*ios底部兼容*/
-         body.ios{
-             padding-bottom: 0;
-         }
-        body.ios #chat-list-bottom-nav{
-             padding-bottom: 20px;
-         }
-
 /* 1. 重置 body，使其成为一个干净的画布 */
 body {
     height: 100%;
@@ -38,12 +30,17 @@ body {
 /* 2. 让 #phone-screen 成为新的“根”容器，撑满整个浏览器窗口 */
 #phone-screen {
     width: 100%;
-    height: calc(100% - 18px);
+    height: 100%;
     position: relative;
     overflow: hidden;
     display: flex;
     flex-direction: column;
     background-color: #000; /* 保留一个默认的黑色背景 */
+}
+
+/* 3. 【核心】隐藏掉模拟器的状态栏 */
+#status-bar {
+    display: none;
 }
 
 /* 4. 【核心】让所有页面的头部自动适应iPhone的“刘海”安全区 */
@@ -57,6 +54,15 @@ body {
     padding-bottom: calc(8px + env(safe-area-inset-bottom));
 }
 
+        #status-bar { position: absolute; top: 0; left: 0; width: 100%; padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; color: white; z-index: 10; font-size: 14px; box-sizing: border-box; pointer-events: none; }
+        #status-bar-time { font-weight: 600; }
+        .battery-container { display: flex; align-items: center; gap: 5px; }
+        .battery-icon { width: 25px; height: 12px; border: 1px solid white; border-radius: 3px; position: relative; padding: 1px; }
+        .battery-icon::after { content: ''; position: absolute; right: -3px; top: 2px; width: 2px; height: 6px; background-color: white; border-radius: 0 1px 1px 0; }
+        .battery-level { height: 100%; background-color: white; border-radius: 1px; transition: width 0.5s ease; }
+        .battery-container.charging .battery-level { background-color: #4cd964; animation: charge-breath 2s infinite; }
+        .battery-container.charging .battery-text { color: #4cd964; }
+        @keyframes charge-breath { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
         .screen { width: 100%; height: 100%; position: absolute; top: 0; left: 0; display: flex; flex-direction: column; overflow: hidden; opacity: 0; visibility: hidden; transition: opacity 0.3s, visibility 0.3s; }
         .screen.active { opacity: 1; visibility: visible; z-index: 1; }
         .header { position: relative; z-index: 15; flex-shrink: 0; padding: 15px 20px; padding-top: 45px; background-color: rgba(247, 247, 247, 0.8); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; font-size: 18px; font-weight: 600; }
@@ -4230,7 +4236,15 @@ input:checked + .slider:before {
 </head>
 <body>
         <div id="phone-screen">
-
+            <div id="status-bar">
+                <span id="status-bar-time">12:00</span>
+                <div id="status-bar-battery" class="battery-container">
+                    <span class="battery-text">--%</span>
+                    <div class="battery-icon">
+                        <div class="battery-level"></div>
+                    </div>
+                </div>
+            </div>
             <div id="notification-bar"><img id="notification-avatar" src=""><div id="notification-content"><div class="name"></div><div class="message"></div></div></div>
             
             <div id="home-screen" class="screen active">
@@ -5866,13 +5880,6 @@ db.version(23).stores({
         // 3. 所有功能函数定义
         // ===================================================================
 
-     function isIOS() {
-         // 使用正则表达式匹配 'iPhone', 'iPad', 'iPod'
-         if(/iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream){
-             document.body.classList.add('ios');
-         }
-    }
-
         function showScreen(screenId) {
             if (screenId === 'chat-list-screen') {
                 window.renderChatListProxy(); 
@@ -6573,7 +6580,7 @@ state.globalSettings.appIcons = { ...DEFAULT_APP_ICONS, ...(state.globalSettings
 
         function showNotification(chatId, messageContent) { clearTimeout(notificationTimeout); const chat = state.chats[chatId]; if (!chat) return; const bar = document.getElementById('notification-bar'); document.getElementById('notification-avatar').src = chat.settings.aiAvatar || chat.settings.groupAvatar || defaultAvatar; document.getElementById('notification-content').querySelector('.name').textContent = chat.name; document.getElementById('notification-content').querySelector('.message').textContent = messageContent; const newBar = bar.cloneNode(true); bar.parentNode.replaceChild(newBar, bar); newBar.addEventListener('click', () => { openChat(chatId); newBar.classList.remove('visible'); }); newBar.classList.add('visible'); notificationTimeout = setTimeout(() => { newBar.classList.remove('visible'); }, 4000); }
 
-        function updateClock() { const now = new Date(); const timeString = now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }); const dateString = now.toLocaleDateString('zh-CN', { weekday: 'long', month: 'long', day: 'numeric' }); document.getElementById('main-time').textContent = timeString; document.getElementById('main-date').textContent = dateString; }
+        function updateClock() { const now = new Date(); const timeString = now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }); const dateString = now.toLocaleDateString('zh-CN', { weekday: 'long', month: 'long', day: 'numeric' }); document.getElementById('main-time').textContent = timeString; document.getElementById('status-bar-time').textContent = timeString; document.getElementById('main-date').textContent = dateString; }
 
 /**
  * 【终极健壮版】解析AI返回的、可能格式不规范的响应内容
@@ -9102,6 +9109,12 @@ async function addSongFromLocal(event) {
         const batteryAlertModal = document.getElementById('battery-alert-modal');
 
         function showBatteryAlert(imageUrl, text) { clearTimeout(batteryAlertTimeout); document.getElementById('battery-alert-image').src = imageUrl; document.getElementById('battery-alert-text').textContent = text; batteryAlertModal.classList.add('visible'); const closeAlert = () => { batteryAlertModal.classList.remove('visible'); batteryAlertModal.removeEventListener('click', closeAlert); }; batteryAlertModal.addEventListener('click', closeAlert); batteryAlertTimeout = setTimeout(closeAlert, 2000); }
+
+        function updateBatteryDisplay(battery) { const batteryContainer = document.getElementById('status-bar-battery'); const batteryLevelEl = batteryContainer.querySelector('.battery-level'); const batteryTextEl = batteryContainer.querySelector('.battery-text'); const level = Math.floor(battery.level * 100); batteryLevelEl.style.width = `${level}%`; batteryTextEl.textContent = `${level}%`; if (battery.charging) { batteryContainer.classList.add('charging'); } else { batteryContainer.classList.remove('charging'); } }
+
+        function handleBatteryChange(battery) { updateBatteryDisplay(battery); const level = battery.level; if (!battery.charging) { if (level <= 0.4 && lastKnownBatteryLevel > 0.4 && !alertFlags.hasShown40) { showBatteryAlert('https://i.postimg.cc/T2yKJ0DV/40.jpg', '有点饿了，可以去找充电器惹'); alertFlags.hasShown40 = true; } if (level <= 0.2 && lastKnownBatteryLevel > 0.2 && !alertFlags.hasShown20) { showBatteryAlert('https://i.postimg.cc/qB9zbKs9/20.jpg', '赶紧的充电，要饿死了'); alertFlags.hasShown20 = true; } if (level <= 0.1 && lastKnownBatteryLevel > 0.1 && !alertFlags.hasShown10) { showBatteryAlert('https://i.postimg.cc/ThMMVfW4/10.jpg', '已阵亡，还有30秒爆炸'); alertFlags.hasShown10 = true; } } if (level > 0.4) alertFlags.hasShown40 = false; if (level > 0.2) alertFlags.hasShown20 = false; if (level > 0.1) alertFlags.hasShown10 = false; lastKnownBatteryLevel = level; }
+
+        async function initBatteryManager() { if ('getBattery' in navigator) { try { const battery = await navigator.getBattery(); lastKnownBatteryLevel = battery.level; handleBatteryChange(battery); battery.addEventListener('levelchange', () => handleBatteryChange(battery)); battery.addEventListener('chargingchange', () => { handleBatteryChange(battery); if (battery.charging) { showBatteryAlert('https://i.postimg.cc/3NDQ0dWG/image.jpg', '窝爱泥，电量吃饱饱'); } }); } catch (err) { console.error("无法获取电池信息:", err); document.querySelector('.battery-text').textContent = 'ᗜωᗜ'; } } else { console.log("浏览器不支持电池状态API。"); document.querySelector('.battery-text').textContent = 'ᗜωᗜ'; } }
 
         async function renderAlbumList() {
             const albumGrid = document.getElementById('album-grid-page');
@@ -12870,9 +12883,8 @@ async function deleteCategory(categoryId) {
 
             updateClock();
             setInterval(updateClock, 1000 * 30);
-            applyGlobalWallpaper();           
-
-isIOS();
+            applyGlobalWallpaper();
+            initBatteryManager(); 
 
 applyAppIcons();
 
